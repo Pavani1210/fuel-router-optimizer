@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Fuel Route Optimizer
 
 A Django-based API that calculates the optimal fuel stops along a route within the USA, minimizing fuel costs based on provided fuel price data.
@@ -83,3 +84,6 @@ The algorithm uses a greedy approach with a lookahead:
 1. It identifies all fuel stations within 10 miles of the route.
 2. It sorts them by distance from the start.
 3. It iteratively finds the cheapest reachable station that allows reaching the next segment, ensuring the 500-mile range is never exceeded.
+=======
+# fuel-router-optimizer
+>>>>>>> a7bfe77f236488a3bc3aeedba6b7554af0cd686c
