@@ -64,51 +64,36 @@ def get_route(start_coords, end_coords):
         print(f"Error fetching route: {response.text}")
         return None
 
-def get_fuel_stations_along_route(route_geometry, max_distance_miles=10):
-    sampled_points = []
-    accumulated_dist = 0
-    prev_p = None
-    for p in route_geometry:
-        if prev_p is None:
-            sampled_points.append(p)
-            prev_p = p
-            continue
-        d = haversine_distance(prev_p[1], prev_p[0], p[1], p[0])
-        accumulated_dist += d
-        if accumulated_dist >= 50: # Increased sampling distance to speed up
-            sampled_points.append(p)
-            accumulated_dist = 0
-        prev_p = p
+def get_fuel_stations_along_route(route_geometry, max_distance_miles=15):
+    # 1. Sample route points to create a corridor
+    sampled_points = route_geometry[::20] # Sample every ~20th point for speed
     
-    lats = [p[1] for p in route_geometry]
-    lons = [p[0] for p in route_geometry]
-    min_lat, max_lat = min(lats) - 0.5, max(lats) + 0.5
-    min_lon, max_lon = min(lons) - 0.5, max(lons) + 0.5
+    # 2. Get Bounding Box
+    lats = [p[1] for p in sampled_points]
+    lons = [p[0] for p in sampled_points]
+    min_lat, max_lat = min(lats) - 0.2, max(lats) + 0.2
+    min_lon, max_lon = min(lons) - 0.2, max(lons) + 0.2
     
-    # Get all cities already geocoded in the bounding box
-    potential_cities = CityCoordinate.objects.filter(
+    # 3. Query all cached cities in the bounding box once
+    cached_cities = CityCoordinate.objects.filter(
         latitude__gte=min_lat, latitude__lte=max_lat,
         longitude__gte=min_lon, longitude__lte=max_lon
     )
     
-    # If no cities are cached, we might need to geocode some.
-    # To keep it fast for the user, we'll only geocode a few cities near the route points
-    if not potential_cities.exists():
-        # This is a fallback for the first run
-        pass
-
     stations_near_route = []
     
-    # Filter all stations by the bounding box of cached cities
-    for city_coord in potential_cities:
-        # Check if city is near any sampled point
+    # 4. Filter cities by distance to the route corridor
+    for city_coord in cached_cities:
         is_near = False
         for sp in sampled_points:
-            if haversine_distance(city_coord.latitude, city_coord.longitude, sp[1], sp[0]) <= max_distance_miles:
-                is_near = True
-                break
+            # Quick distance check
+            if abs(city_coord.latitude - sp[1]) < 0.3 and abs(city_coord.longitude - sp[0]) < 0.3:
+                if haversine_distance(city_coord.latitude, city_coord.longitude, sp[1], sp[0]) <= max_distance_miles:
+                    is_near = True
+                    break
         
         if is_near:
+            # Bulk add stations from this city
             city_stations = FuelStation.objects.filter(city=city_coord.city, state=city_coord.state)
             for s in city_stations:
                 stations_near_route.append({

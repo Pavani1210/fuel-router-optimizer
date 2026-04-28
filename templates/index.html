@@ -73,6 +73,28 @@
             justify-content: center; 
             gap: 1rem; 
         }
+        .marker-pin {
+            width: 30px;
+            height: 30px;
+            border-radius: 50% 50% 50% 0;
+            position: absolute;
+            transform: rotate(-45deg);
+            left: 50%;
+            top: 50%;
+            margin: -15px 0 0 -15px;
+        }
+        .custom-div-icon i {
+            position: absolute;
+            width: 22px;
+            font-size: 16px;
+            left: 0;
+            right: 0;
+            margin: 10px auto;
+            text-align: center;
+            color: white;
+            font-style: normal;
+            font-weight: bold;
+        }
         .stop-card {
             background: var(--bg);
             padding: 1rem;
@@ -173,6 +195,17 @@
                 stopsList.innerHTML = '';
                 markersLayer.clearLayers();
 
+                // Custom Icons
+                const startIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#10b981;' class='marker-pin'></div><i class='material-icons'>S</i>", iconSize: [30, 42], iconAnchor: [15, 42] });
+                const finishIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#ef4444;' class='marker-pin'></div><i class='material-icons'>F</i>", iconSize: [30, 42], iconAnchor: [15, 42] });
+                const fuelIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#6366f1;' class='marker-pin'></div><i class='material-icons'>⛽</i>", iconSize: [30, 42], iconAnchor: [15, 42] });
+
+                L.marker([data.start.lat, data.start.lon], {title: "Start"}).addTo(markersLayer)
+                    .bindPopup(`<b>Start:</b> ${data.start.name}`);
+                
+                L.marker([data.finish.lat, data.finish.lon], {title: "Finish"}).addTo(markersLayer)
+                    .bindPopup(`<b>Finish:</b> ${data.finish.name}`);
+
                 data.fuel_stops.forEach(stop => {
                     const card = document.createElement('div');
                     card.className = 'stop-card';
@@ -180,18 +213,27 @@
                         <div class="stop-name">${stop.name}</div>
                         <div class="stop-details">${stop.city}, ${stop.state}</div>
                         <div class="stop-price">$${stop.price.toFixed(2)}/gal | ${stop.estimated_gallons_purchased} gal | $${stop.estimated_stop_cost}</div>
-                        <div class="stop-details" style="font-style: italic; font-size: 11px;">${stop.selection_reason}</div>
+                        <div class="stop-details" style="font-style: italic; font-size: 11px; margin-top: 4px;">${stop.selection_reason}</div>
                     `;
                     stopsList.appendChild(card);
 
                     L.marker([stop.lat, stop.lon]).addTo(markersLayer)
-                        .bindPopup(`<b>${stop.name}</b><br>$${stop.price.toFixed(2)}/gal<br>${stop.estimated_gallons_purchased} gal`);
+                        .bindPopup(`
+                            <div style="font-family: 'Inter', sans-serif;">
+                                <b style="color:#6366f1;">${stop.name}</b><br>
+                                <span style="font-size:12px; color:#64748b;">${stop.address}, ${stop.city}</span><br>
+                                <hr style="margin: 8px 0; border: 0; border-top: 1px solid #e2e8f0;">
+                                <b>Price:</b> $${stop.price.toFixed(2)}/gal<br>
+                                <b>Gallons:</b> ${stop.estimated_gallons_purchased} gal<br>
+                                <b>Cost:</b> $${stop.estimated_stop_cost}
+                            </div>
+                        `);
                 });
 
                 if (routeLayer) map.removeLayer(routeLayer);
                 const latlons = data.route_coordinates.map(p => [p[1], p[0]]);
-                routeLayer = L.polyline(latlons, { color: '#6366f1', weight: 5 }).addTo(map);
-                map.fitBounds(routeLayer.getBounds());
+                routeLayer = L.polyline(latlons, { color: '#6366f1', weight: 6, opacity: 0.8 }).addTo(map);
+                map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
 
             } catch (err) {
                 console.error(err);
