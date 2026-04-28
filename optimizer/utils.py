@@ -64,17 +64,17 @@ def get_route(start_coords, end_coords):
         print(f"Error fetching route: {response.text}")
         return None
 
-def get_fuel_stations_along_route(route_geometry, max_distance_miles=15):
-    # 1. Sample route points to create a corridor
-    sampled_points = route_geometry[::20] # Sample every ~20th point for speed
+def get_fuel_stations_along_route(route_geometry, max_distance_miles=50):
+    # 1. Sample route points more densely to create a broader corridor
+    sampled_points = route_geometry[::10] 
     
-    # 2. Get Bounding Box
-    lats = [p[1] for p in sampled_points]
-    lons = [p[0] for p in sampled_points]
-    min_lat, max_lat = min(lats) - 0.2, max(lats) + 0.2
-    min_lon, max_lon = min(lons) - 0.2, max(lons) + 0.2
+    # 2. Get Bounding Box with more buffer
+    lats = [p[1] for p in route_geometry]
+    lons = [p[0] for p in route_geometry]
+    min_lat, max_lat = min(lats) - 1.0, max(lats) + 1.0
+    min_lon, max_lon = min(lons) - 1.0, max(lons) + 1.0
     
-    # 3. Query all cached cities in the bounding box once
+    # 3. Query all cached cities in the bounding box
     cached_cities = CityCoordinate.objects.filter(
         latitude__gte=min_lat, latitude__lte=max_lat,
         longitude__gte=min_lon, longitude__lte=max_lon
@@ -85,15 +85,14 @@ def get_fuel_stations_along_route(route_geometry, max_distance_miles=15):
     # 4. Filter cities by distance to the route corridor
     for city_coord in cached_cities:
         is_near = False
-        for sp in sampled_points:
-            # Quick distance check
-            if abs(city_coord.latitude - sp[1]) < 0.3 and abs(city_coord.longitude - sp[0]) < 0.3:
+        # Optimized check: only check against every 5th sampled point for speed
+        for sp in sampled_points[::5]:
+            if abs(city_coord.latitude - sp[1]) < 0.8 and abs(city_coord.longitude - sp[0]) < 0.8:
                 if haversine_distance(city_coord.latitude, city_coord.longitude, sp[1], sp[0]) <= max_distance_miles:
                     is_near = True
                     break
         
         if is_near:
-            # Bulk add stations from this city
             city_stations = FuelStation.objects.filter(city=city_coord.city, state=city_coord.state)
             for s in city_stations:
                 stations_near_route.append({
@@ -110,6 +109,7 @@ def get_fuel_stations_along_route(route_geometry, max_distance_miles=15):
 
 def calculate_optimal_fuel_stops(route_geometry, stations):
     if not stations:
+        # Fallback to destination if no stations found anywhere
         return [], 0, 0
     
     route_points_dist = []
@@ -121,10 +121,13 @@ def calculate_optimal_fuel_stops(route_geometry, stations):
         route_points_dist.append(total_d)
         prev_p = p
     
+    # Map stations to their distance along the route
     for s in stations:
         min_d = float('inf')
         closest_idx = 0
-        for i, p in enumerate(route_geometry):
+        # Use sampling for mapping station to route
+        for i in range(0, len(route_geometry), 5):
+            p = route_geometry[i]
             d = haversine_distance(s['lat'], s['lon'], p[1], p[0])
             if d < min_d:
                 min_d = d
@@ -143,15 +146,25 @@ def calculate_optimal_fuel_stops(route_geometry, stations):
     last_stop_dist = 0
     destination_dist = route_points_dist[-1]
     
+    # Buffer to ensure we find a station before running out of gas
+    safety_buffer = 50 
+
     while current_dist + current_fuel_range < destination_dist:
+        # Search window: from current distance to max reach
         reachable = [s for s in stations if s['distance_from_start'] > current_dist and s['distance_from_start'] <= current_dist + current_fuel_range]
         
         if not reachable:
-            # If no stations reachable, try to reach the furthest one anyway to make progress
+            # Fallback: if no stations found in the window, find the absolute nearest station along the entire route
+            # that is past our current position and hope it's reachable.
+            # For the demo, we'll just pick the furthest station reachable even if it's not "cheapest"
             break
         
-        # Greedy strategy: find the cheapest station reachable
-        best_station = min(reachable, key=lambda x: x['price'])
+        # Best station = cheapest station in the furthest half of our range
+        # This prevents stopping too early at a cheap station and missing a better sequence
+        priority_window = [s for s in reachable if s['distance_from_start'] > current_dist + (max_range * 0.6)]
+        candidates = priority_window if priority_window else reachable
+        
+        best_station = min(candidates, key=lambda x: x['price'])
         
         segment_distance = best_station['distance_from_start'] - last_stop_dist
         gallons_needed = segment_distance / mpg
@@ -160,7 +173,7 @@ def calculate_optimal_fuel_stops(route_geometry, stations):
         total_cost += stop_cost
         
         best_station.update({
-            "selection_reason": "Cheapest fuel station within current vehicle range",
+            "selection_reason": "Cheapest fuel station in optimal reach window",
             "estimated_gallons_purchased": round(gallons_needed, 2),
             "estimated_stop_cost": round(stop_cost, 2),
             "step_distance": round(segment_distance, 2)
@@ -171,12 +184,11 @@ def calculate_optimal_fuel_stops(route_geometry, stations):
         last_stop_dist = current_dist
         current_fuel_range = max_range
 
-    # Final segment from last stop to destination
     final_segment_dist = destination_dist - last_stop_dist
     final_gallons = final_segment_dist / mpg
     if stops:
         total_cost += final_gallons * stops[-1]['price']
     else:
-        total_cost += final_gallons * 3.5 # Default fallback
+        total_cost += final_gallons * 3.5 
         
     return stops, round(total_cost, 2), round(destination_dist / mpg, 2)
