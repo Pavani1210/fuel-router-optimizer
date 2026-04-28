@@ -173,7 +173,7 @@ def calculate_optimal_fuel_stops(route_geometry, stations):
         total_cost += stop_cost
         
         best_station.update({
-            "selection_reason": "Cheapest fuel station in optimal reach window",
+            "selection_reason": "Selected based on lowest fuel price within route corridor before 500-mile range limit",
             "estimated_gallons_purchased": round(gallons_needed, 2),
             "estimated_stop_cost": round(stop_cost, 2),
             "step_distance": round(segment_distance, 2)

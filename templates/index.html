@@ -135,7 +135,7 @@
                     <div id="totalGallons" class="stat-value">0 gal</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-label">Stops</div>
+                    <div class="stat-label">Fuel Stops</div>
                     <div id="numStops" class="stat-value">0</div>
                 </div>
             </div>
@@ -196,14 +196,14 @@
                 markersLayer.clearLayers();
 
                 // Custom Icons
-                const startIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#10b981;' class='marker-pin'></div><i class='material-icons'>S</i>", iconSize: [30, 42], iconAnchor: [15, 42] });
-                const finishIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#ef4444;' class='marker-pin'></div><i class='material-icons'>F</i>", iconSize: [30, 42], iconAnchor: [15, 42] });
-                const fuelIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#6366f1;' class='marker-pin'></div><i class='material-icons'>⛽</i>", iconSize: [30, 42], iconAnchor: [15, 42] });
+                const startIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#10b981;' class='marker-pin'></div><i class='material-icons' style='color:white; font-style:normal; font-weight:bold; position:absolute; top:8px; left:9px;'>S</i>", iconSize: [30, 42], iconAnchor: [15, 42] });
+                const finishIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#ef4444;' class='marker-pin'></div><i class='material-icons' style='color:white; font-style:normal; font-weight:bold; position:absolute; top:8px; left:9px;'>F</i>", iconSize: [30, 42], iconAnchor: [15, 42] });
+                const fuelIcon = L.divIcon({ className: 'custom-div-icon', html: "<div style='background-color:#6366f1;' class='marker-pin'></div><i class='material-icons' style='color:white; font-style:normal; font-weight:bold; position:absolute; top:8px; left:5px;'>⛽</i>", iconSize: [30, 42], iconAnchor: [15, 42] });
 
-                L.marker([data.start.lat, data.start.lon], {title: "Start"}).addTo(markersLayer)
-                    .bindPopup(`<b>Start:</b> ${data.start.name}`);
+                L.marker([data.start.lat, data.start.lon], {icon: startIcon}).addTo(markersLayer)
+                    .bindPopup(`<b>Start:</b> ${data.start.name}`).openPopup();
                 
-                L.marker([data.finish.lat, data.finish.lon], {title: "Finish"}).addTo(markersLayer)
+                L.marker([data.finish.lat, data.finish.lon], {icon: finishIcon}).addTo(markersLayer)
                     .bindPopup(`<b>Finish:</b> ${data.finish.name}`);
 
                 data.fuel_stops.forEach(stop => {
@@ -217,7 +217,7 @@
                     `;
                     stopsList.appendChild(card);
 
-                    L.marker([stop.lat, stop.lon]).addTo(markersLayer)
+                    L.marker([stop.lat, stop.lon], {icon: fuelIcon}).addTo(markersLayer)
                         .bindPopup(`
                             <div style="font-family: 'Inter', sans-serif;">
                                 <b style="color:#6366f1;">${stop.name}</b><br>
@@ -232,7 +232,7 @@
 
                 if (routeLayer) map.removeLayer(routeLayer);
                 const latlons = data.route_coordinates.map(p => [p[1], p[0]]);
-                routeLayer = L.polyline(latlons, { color: '#6366f1', weight: 6, opacity: 0.8 }).addTo(map);
+                routeLayer = L.polyline(latlons, { color: '#6366f1', weight: 8, opacity: 0.9 }).addTo(map);
                 map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
 
             } catch (err) {
