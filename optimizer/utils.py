@@ -150,17 +150,11 @@ def calculate_optimal_fuel_stops(route_geometry, stations):
     safety_buffer = 50 
 
     while current_dist + current_fuel_range < destination_dist:
-        # Search window: from current distance to max reach
         reachable = [s for s in stations if s['distance_from_start'] > current_dist and s['distance_from_start'] <= current_dist + current_fuel_range]
         
         if not reachable:
-            # Fallback: if no stations found in the window, find the absolute nearest station along the entire route
-            # that is past our current position and hope it's reachable.
-            # For the demo, we'll just pick the furthest station reachable even if it's not "cheapest"
             break
         
-        # Best station = cheapest station in the furthest half of our range
-        # This prevents stopping too early at a cheap station and missing a better sequence
         priority_window = [s for s in reachable if s['distance_from_start'] > current_dist + (max_range * 0.6)]
         candidates = priority_window if priority_window else reachable
         
@@ -168,8 +162,14 @@ def calculate_optimal_fuel_stops(route_geometry, stations):
         
         segment_distance = best_station['distance_from_start'] - last_stop_dist
         gallons_needed = segment_distance / mpg
-        stop_cost = gallons_needed * best_station['price']
         
+        # If this is the LAST stop (i.e., destination is reachable from here), 
+        # include the fuel needed to reach the destination.
+        if best_station['distance_from_start'] + max_range >= destination_dist:
+            extra_dist = destination_dist - best_station['distance_from_start']
+            gallons_needed += extra_dist / mpg
+        
+        stop_cost = gallons_needed * best_station['price']
         total_cost += stop_cost
         
         best_station.update({
@@ -184,11 +184,8 @@ def calculate_optimal_fuel_stops(route_geometry, stations):
         last_stop_dist = current_dist
         current_fuel_range = max_range
 
-    final_segment_dist = destination_dist - last_stop_dist
-    final_gallons = final_segment_dist / mpg
-    if stops:
-        total_cost += final_gallons * stops[-1]['price']
-    else:
-        total_cost += final_gallons * 3.5 
+    # If NO stops were needed (destination reachable from start)
+    if not stops:
+        total_cost = (destination_dist / mpg) * 3.5 # Default fallback price
         
     return stops, round(total_cost, 2), round(destination_dist / mpg, 2)
