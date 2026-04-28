@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <title>Fuel Route Optimizer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+        #sidebar {
+            width: 400px;
+            background: var(--card-bg);
+            padding: 2rem;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.3);
+            z-index: 10;
+            overflow-y: auto;
+        }
+        #map {
+            flex-grow: 1;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: var(--primary); }
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.875rem; }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg);
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            color: var(--text);
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: var(--primary-hover); }
+        #results { margin-top: 2rem; }
+        .stat { background: var(--bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; border: 1px solid #334155; }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+        .stat-value { font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; }
+        .stop-card {
+            background: var(--bg);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-left: 4px solid var(--primary);
+        }
+        .stop-name { font-weight: 600; }
+        .stop-details { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .stop-price { color: #10b981; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h1>Fuel Optimizer</h1>
+        <div class="input-group">
+            <label>Start Location</label>
+            <input type="text" id="start" placeholder="e.g. New York, NY" value="New York, NY">
+        </div>
+        <div class="input-group">
+            <label>Finish Location</label>
+            <input type="text" id="finish" placeholder="e.g. Los Angeles, CA" value="Chicago, IL">
+        </div>
+        <button id="optimizeBtn">Optimize Route</button>
+
+        <div id="results" style="display: none;">
+            <div class="stat">
+                <div class="stat-label">Total Distance</div>
+                <div id="totalDistance" class="stat-value">0 mi</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Estimated Fuel Cost</div>
+                <div id="totalCost" class="stat-value">$0.00</div>
+            </div>
+            <h3>Recommended Fuel Stops</h3>
+            <div id="stopsList"></div>
+        </div>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        const map = L.map('map').setView([39.8283, -98.5795], 4);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        let routeLayer, markersLayer = L.layerGroup().addTo(map);
+
+        document.getElementById('optimizeBtn').onclick = async () => {
+            const start = document.getElementById('start').value;
+            const finish = document.getElementById('finish').value;
+            const btn = document.getElementById('optimizeBtn');
+            btn.disabled = true;
+            btn.innerText = 'Optimizing...';
+
+            try {
+                const response = await fetch('/api/optimize-route/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ start, finish })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Internal Server Error' }));
+                    alert('Error: ' + (errorData.error || 'Unknown error'));
+                    return;
+                }
+                
+                const data = await response.json();
+
+                document.getElementById('results').style.display = 'block';
+                document.getElementById('totalDistance').innerText = data.total_distance_miles + ' mi';
+                document.getElementById('totalCost').innerText = '$' + data.total_fuel_cost;
+
+                const stopsList = document.getElementById('stopsList');
+                stopsList.innerHTML = '';
+                markersLayer.clearLayers();
+
+                data.fuel_stops.forEach(stop => {
+                    const card = document.createElement('div');
+                    card.className = 'stop-card';
+                    card.innerHTML = `
+                        <div class="stop-name">${stop.name}</div>
+                        <div class="stop-details">${stop.city}, ${stop.state}</div>
+                        <div class="stop-price">$${stop.price.toFixed(2)} / gal</div>
+                    `;
+                    stopsList.appendChild(card);
+
+                    L.marker([stop.lat, stop.lon]).addTo(markersLayer)
+                        .bindPopup(`<b>${stop.name}</b><br>$${stop.price.toFixed(2)}/gal`);
+                });
+
+                if (routeLayer) map.removeLayer(routeLayer);
+                const latlons = data.route.map(p => [p[1], p[0]]);
+                routeLayer = L.polyline(latlons, { color: '#6366f1', weight: 5 }).addTo(map);
+                map.fitBounds(routeLayer.getBounds());
+
+            } catch (err) {
+                console.error(err);
+                alert('An error occurred');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Optimize Route';
+            }
+        };
+    </script>
+</body>
+</html>

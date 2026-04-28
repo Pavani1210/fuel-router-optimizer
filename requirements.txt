@@ -1,0 +1,8 @@
+django
+djangorestframework
+python-dotenv
+requests
+pandas
+geopy
+pymongo
+django-cors-headers
