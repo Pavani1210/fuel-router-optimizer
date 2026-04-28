@@ -59,10 +59,20 @@
             transition: background 0.2s;
         }
         button:hover { background: var(--primary-hover); }
-        #results { margin-top: 2rem; }
-        .stat { background: var(--bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; border: 1px solid #334155; }
-        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
-        .stat-value { font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; }
+        .stat { background: var(--bg); padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #334155; }
+        .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; }
+        .stat-value { font-size: 1rem; font-weight: 700; margin-top: 0.25rem; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 1.5rem; }
+        .info-bar { 
+            background: #334155; 
+            padding: 0.5rem; 
+            border-radius: 0.5rem; 
+            margin-top: 0.75rem; 
+            font-size: 0.75rem; 
+            display: flex; 
+            justify-content: center; 
+            gap: 1rem; 
+        }
         .stop-card {
             background: var(--bg);
             padding: 1rem;
@@ -89,14 +99,30 @@
         <button id="optimizeBtn">Optimize Route</button>
 
         <div id="results" style="display: none;">
-            <div class="stat">
-                <div class="stat-label">Total Distance</div>
-                <div id="totalDistance" class="stat-value">0 mi</div>
+            <div class="stat-grid">
+                <div class="stat">
+                    <div class="stat-label">Distance</div>
+                    <div id="totalDistance" class="stat-value">0 mi</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Total Cost</div>
+                    <div id="totalCost" class="stat-value">$0.00</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Gallons</div>
+                    <div id="totalGallons" class="stat-value">0 gal</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Stops</div>
+                    <div id="numStops" class="stat-value">0</div>
+                </div>
             </div>
-            <div class="stat">
-                <div class="stat-label">Estimated Fuel Cost</div>
-                <div id="totalCost" class="stat-value">$0.00</div>
+            
+            <div class="info-bar">
+                <span>Range: <b id="range">500 mi</b></span> | 
+                <span>Eff: <b id="efficiency">10 mpg</b></span>
             </div>
+
             <h3>Recommended Fuel Stops</h3>
             <div id="stopsList"></div>
         </div>
@@ -138,6 +164,10 @@
                 document.getElementById('results').style.display = 'block';
                 document.getElementById('totalDistance').innerText = data.total_distance_miles + ' mi';
                 document.getElementById('totalCost').innerText = '$' + data.total_fuel_cost;
+                document.getElementById('totalGallons').innerText = data.total_gallons_required + ' gal';
+                document.getElementById('numStops').innerText = data.number_of_fuel_stops;
+                document.getElementById('efficiency').innerText = data.fuel_efficiency_mpg + ' mpg';
+                document.getElementById('range').innerText = data.vehicle_range_miles + ' mi';
 
                 const stopsList = document.getElementById('stopsList');
                 stopsList.innerHTML = '';
@@ -149,16 +179,17 @@
                     card.innerHTML = `
                         <div class="stop-name">${stop.name}</div>
                         <div class="stop-details">${stop.city}, ${stop.state}</div>
-                        <div class="stop-price">$${stop.price.toFixed(2)} / gal</div>
+                        <div class="stop-price">$${stop.price.toFixed(2)}/gal | ${stop.estimated_gallons_purchased} gal | $${stop.estimated_stop_cost}</div>
+                        <div class="stop-details" style="font-style: italic; font-size: 11px;">${stop.selection_reason}</div>
                     `;
                     stopsList.appendChild(card);
 
                     L.marker([stop.lat, stop.lon]).addTo(markersLayer)
-                        .bindPopup(`<b>${stop.name}</b><br>$${stop.price.toFixed(2)}/gal`);
+                        .bindPopup(`<b>${stop.name}</b><br>$${stop.price.toFixed(2)}/gal<br>${stop.estimated_gallons_purchased} gal`);
                 });
 
                 if (routeLayer) map.removeLayer(routeLayer);
-                const latlons = data.route.map(p => [p[1], p[0]]);
+                const latlons = data.route_coordinates.map(p => [p[1], p[0]]);
                 routeLayer = L.polyline(latlons, { color: '#6366f1', weight: 5 }).addTo(map);
                 map.fitBounds(routeLayer.getBounds());
 

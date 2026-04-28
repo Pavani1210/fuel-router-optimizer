@@ -35,16 +35,21 @@ class RouteOptimizerView(APIView):
             stations = get_fuel_stations_along_route(geometry)
             
             # 5. Calculate optimal stops
-            fuel_stops, total_fuel_cost = calculate_optimal_fuel_stops(geometry, stations)
+            fuel_stops, total_fuel_cost, total_gallons = calculate_optimal_fuel_stops(geometry, stations)
             
             return Response({
                 "start": {"lat": start_lat, "lon": start_lon, "name": start_location},
                 "finish": {"lat": finish_lat, "lon": finish_lon, "name": finish_location},
                 "total_distance_miles": round(total_distance_miles, 2),
                 "total_fuel_cost": round(total_fuel_cost, 2),
+                "total_gallons_required": total_gallons,
+                "number_of_fuel_stops": len(fuel_stops),
+                "fuel_efficiency_mpg": 10,
+                "vehicle_range_miles": 500,
                 "fuel_stops": fuel_stops,
                 "map_url": f"https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route={start_lat}%2C{start_lon}%3B{finish_lat}%2C{finish_lon}",
-                "route": geometry
+                "route_coordinates": geometry[::10], # Reduce payload size
+                "map_provider": "CartoDB Positron"
             })
         except Exception as e:
             import traceback

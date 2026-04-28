@@ -68,22 +68,35 @@ Calculates the optimal route and fuel stops.
 ```
 
 **Response:**
+## Optimization Algorithm
+The algorithm uses a **Greedy Strategy with Distance Lookahead**:
+1.  **Buffer Filtering**: It identifies all fuel stations within 10 miles of the calculated route geometry.
+2.  **Distance Indexing**: Every station is indexed by its cumulative distance from the start point of the route.
+3.  **Cheapest Reachable Search**: 
+    *   Starting from the current location (initially 0), it identifies all stations reachable within the vehicle's remaining range (500 miles).
+    *   It selects the **cheapest** station among the reachable ones.
+    *   It repeats this process until the destination is reachable within the current range.
+4.  **Metadata Calculation**: For each stop, it calculates the required gallons for that segment and the estimated cost.
+
+## Example API Response
+
+### NY → Chicago (~800 miles)
 ```json
 {
-  "start": {"lat": 40.7128, "lon": -74.006, "name": "New York, NY"},
-  "finish": {"lat": 41.8781, "lon": -87.6298, "name": "Chicago, IL"},
-  "total_distance_miles": 789.2,
-  "total_fuel_cost": 254.5,
-  "fuel_stops": [...],
-  "route": [...]
+  "total_distance_miles": 792.76,
+  "total_fuel_cost": 242.51,
+  "number_of_fuel_stops": 1,
+  "fuel_stops": [
+    {
+      "name": "SHEETZ #639",
+      "city": "Youngstown",
+      "state": "OH",
+      "price": 3.059,
+      "selection_reason": "Cheapest fuel station within current vehicle range"
+    }
+  ]
 }
 ```
 
-## Optimization Algorithm
-The algorithm uses a greedy approach with a lookahead:
-1. It identifies all fuel stations within 10 miles of the route.
-2. It sorts them by distance from the start.
-3. It iteratively finds the cheapest reachable station that allows reaching the next segment, ensuring the 500-mile range is never exceeded.
-=======
-# fuel-router-optimizer
->>>>>>> a7bfe77f236488a3bc3aeedba6b7554af0cd686c
+### NY → LA (~2,800 miles)
+The system will return 5+ stops, each strategically chosen to minimize costs while maintaining range.
