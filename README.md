@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Fuel Route Optimizer
 
 A Django-based API that calculates the optimal fuel stops along a route within the USA, minimizing fuel costs based on provided fuel price data.
